@@ -12,11 +12,11 @@ sbatch array_download.sh $INDEX_PATH $DATA_PATH $QUERY_PATH
 ```
 
 ```{bash}
-cd /scratch/ssd004/datasets/cellxgene/
+cd /usr/project/xtmp/ls542
 source env/bin/activate
 
-INDEX_PATH="/scratch/ssd004/datasets/cellxgene/index"
-DATA_PATH="/scratch/ssd004/datasets/cellxgene/anndata"
+INDEX_PATH="/usr/project/xtmp/ls542/index"
+DATA_PATH="/usr/project/xtmp/ls542/anndata"
 QUERY_PATH="query_list.txt"
 ./build_soma_idx.sh $INDEX_PATH $QUERY_PATH
 sbatch array_download.sh $INDEX_PATH $DATA_PATH $QUERY_PATH
