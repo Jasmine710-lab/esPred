@@ -10,8 +10,11 @@ source /scratch/ssd004/datasets/cellxgene/env/bin/activate
 
 cd "/scratch/ssd004/datasets/cellxgene/scFormer/census_data"
 
-INDEX_PATH="/scratch/ssd004/datasets/cellxgene/index"
-DATA_PATH="/scratch/ssd004/datasets/cellxgene/anndata"
+# INDEX_PATH="/scratch/ssd004/datasets/cellxgene/index"
+# DATA_PATH="/scratch/ssd004/datasets/cellxgene/anndata"
+# QUERY_PATH="query_list.txt"
+INDEX_PATH="/usr/project/xtmp/ls542/"
+DATA_PATH="/usr/project/xtmp/ls542/anndata"
 QUERY_PATH="query_list.txt"
 
 query_name=$(sed -n "${SLURM_ARRAY_TASK_ID}p" $QUERY_PATH)

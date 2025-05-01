@@ -6,16 +6,20 @@
 #SBATCH --qos=nopreemption
 #SBATCH -p cpu
 
-source ~/.cache/pypoetry/virtualenvs/scformer-9yG_XnDJ-py3.9/bin/activate
+# source ~/.cache/pypoetry/virtualenvs/scformer-9yG_XnDJ-py3.9/bin/activate
 QUERY_PATH="query_list.txt"
 
 query_name=$(sed -n "${SLURM_ARRAY_TASK_ID}p" $QUERY_PATH)
 
 echo "processing ${query_name}"
 
-DATA_PATH="/scratch/ssd004/datasets/cellxgene/anndata/${query_name}"
-OUTPUT_PATH="/scratch/ssd004/datasets/cellxgene/scb_strict/${query_name}"
-VOCAB_PATH="/scratch/ssd004/datasets/cellxgene/scFormer/scformer/tokenizer/default_census_vocab.json"
+# DATA_PATH="/scratch/ssd004/datasets/cellxgene/anndata/${query_name}"
+# OUTPUT_PATH="/scratch/ssd004/datasets/cellxgene/scb_strict/${query_name}"
+# VOCAB_PATH="/scratch/ssd004/datasets/cellxgene/scFormer/scformer/tokenizer/default_census_vocab.json"
+
+DATA_PATH="/usr/project/xtmp/ls542/anndata/${query_name}"
+OUTPUT_PATH="/usr/project/xtmp/ls542/scb_strict/${query_name}"
+VOCAB_PATH="/home/users/ls542/scGPT/scGPT/scgpt/tokenizer/new_default_vocab.json"
 
 N=200000
 

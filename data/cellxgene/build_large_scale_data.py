@@ -1,4 +1,3 @@
-# build large-scale data in scBank format from a group of AnnData objects
 # %%
 import gc
 import json
@@ -10,15 +9,16 @@ from typing import Dict, List, Optional
 import warnings
 import numpy as np
 import os
-
+import random
 import scanpy as sc
-
+from scipy import sparse
+import pandas as pd
 import sys
-sys.path.append("/scratch/ssd004/datasets/cellxgene/scFormer")
 
 
-import scformer as scf
-from scformer import scbank
+
+import scgpt as scg
+from scgpt import scbank
 
 # %%
 parser = argparse.ArgumentParser(
@@ -112,9 +112,9 @@ if args.metainfo is not None:
     }
 
 if args.vocab_file is None:
-    vocab = scf.tokenizer.get_default_gene_vocab()
+    vocab = scg.tokenizer.get_default_gene_vocab()
 else:
-    vocab = scf.tokenizer.GeneVocab.from_file(args.vocab_file)
+    vocab = scg.tokenizer.GeneVocab.from_file(args.vocab_file)
 
 # %% [markdown]
 # # preprocessing data
@@ -124,7 +124,7 @@ def preprocess(
     adata: sc.AnnData,
     main_table_key: str = "counts",
     include_obs: Optional[Dict[str, List[str]]] = None,
-    N = 10000
+    N = 800000
 ) -> sc.AnnData:
     """
     Preprocess the data for scBank. This function will modify the AnnData object in place.
@@ -144,35 +144,63 @@ def preprocess(
 
     # filter genes
     sc.pp.filter_genes(adata, min_counts=(3 / 10000) * N)
+    sc.pp.normalize_total(adata, target_sum=1e4)
+    sc.pp.log1p(adata)
+    sc.pp.highly_variable_genes(adata, n_top_genes=1200)
+    adata = adata[:, adata.var.highly_variable]
 
-    # TODO: add binning in sparse matrix and save in separate datatable
-    # preprocessor = Preprocessor(
-    #     use_key="X",  # the key in adata.layers to use as raw data
-    #     filter_gene_by_counts=False,  # step 1
-    #     filter_cell_by_counts=False,  # step 2
-    #     normalize_total=False,  # 3. whether to normalize the raw data and to what sum
-    #     log1p=False,  # 4. whether to log1p the normalized data
-    #     binning=51,  # 6. whether to bin the raw data and to what number of bins
-    #     result_binned_key="X_binned",  # the key in adata.layers to store the binned data
-    # )
-    # preprocessor(adata)
+    # Perform cell clustering and concatenation
+    grouped = adata.obs.groupby('cell_type')
+    
+    new_obs = []
+    new_X_data = []
+    
+    for celltype, group in grouped:
+        cell_indices = group.index.tolist()
+        random.shuffle(cell_indices)
+        
+        # Ensure the number of cells is a multiple of 4
+        cells_to_use = len(cell_indices) - (len(cell_indices) % 4)
+        cell_indices = cell_indices[:cells_to_use]
+        
+        # Create clusters of 4 cells
+        for i in range(0, len(cell_indices), 4):
+            cluster_cells = cell_indices[i:i+4]
+            
+            # Initialize an empty array for the concatenated expression values
+            cluster_expr = np.zeros(1200)
+            
+            # Concatenate expression values from different gene ranges for each cell
+            for j, cell in enumerate(cluster_cells):
+                start_idx = j * 300
+                end_idx = (j + 1) * 300
+                cluster_expr[start_idx:end_idx] = adata[cell, start_idx:end_idx].X.toarray().flatten()
+            
+            new_obs.append({
+                'cell_type': celltype,
+                'Original_Cells': ','.join(cluster_cells)
+            })
+            new_X_data.append(sparse.csr_matrix(cluster_expr))
 
-    adata.layers[main_table_key] = adata.X.copy()  # preserve counts
-    # sc.pp.normalize_total(adata, target_sum=1e4)
-    # sc.pp.log1p(adata)
-    # adata.raw = adata  # freeze the state in `.raw`
+    # Create new AnnData object
+    new_obs_df = pd.DataFrame(new_obs)
+    new_X = sparse.vstack(new_X_data)
+    
+    # Keep the original var DataFrame
+    new_var = adata.var.copy()
+    
+    adata_clustered = sc.AnnData(X=new_X, obs=new_obs_df, var=new_var)
+    print(f"Original shape: {adata.shape}")
+    print(f"New clustered shape: {adata_clustered.shape}")
 
-    # apply a hard clip to the data for now
+    adata_clustered.layers[main_table_key] = adata_clustered.X.copy()  # preserve counts
+
     print(
-        f"original mean and max of counts: {adata.layers[main_table_key].mean():.2f}, "
-        f"{adata.layers[main_table_key].max():.2f}"
+        f"original mean and max of counts: {adata_clustered.layers[main_table_key].mean():.2f}, "
+        f"{adata_clustered.layers[main_table_key].max():.2f}"
     )
-    # if isinstance(adata.layers[main_table_key], np.ndarray):
-    #     adata.layers[main_table_key] = adata.layers[main_table_key].clip(0, 30)
-    # else:  # assume it is a sparse matrix
-    #     adata.layers[main_table_key].data = adata.layers[main_table_key].data.clip(0, 30)
 
-    return adata
+    return adata_clustered
 
 
 # %%
@@ -186,7 +214,9 @@ for f in files:
             N = args.N
         )
         print(f"read {adata.shape} valid data from {f.name}")
-
+        print(f"new adata.obs: {adata.obs.columns}")
+        print(f"new adata.var: {adata.var.columns}")
+        # adata.obs["cell_type"].value_counts().to_csv("/home/users/ls542/scGPT/scGPT/data/cellxgene/cell_type.csv")
         # TODO: CHECK AND EXPAND VOCABULARY IF NEEDED
         # NOTE: do not simply expand, need to check whether to use the same style of gene names
 
